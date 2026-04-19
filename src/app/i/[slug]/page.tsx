@@ -14,10 +14,17 @@ export default async function InviteePage({
 
   const row = await sb
     .from("invitees")
-    .select("name, slug")
+    .select("name, slug, title")
     .eq("slug", slug)
     .maybeSingle();
   if (row.error || !row.data) notFound();
+
+  const title =
+    row.data.title === "Mr" ||
+    row.data.title === "Mrs" ||
+    row.data.title === "Miss"
+      ? row.data.title
+      : null;
 
   const latest = await sb
     .from("rsvps")
@@ -40,6 +47,7 @@ export default async function InviteePage({
     <Invite
       downloadSlug={row.data.slug}
       inviteeName={row.data.name}
+      inviteeTitle={title}
       existingRsvp={existingRsvp}
     />
   );

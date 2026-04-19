@@ -413,10 +413,12 @@ type ExistingRsvp = {
 export default function Invite({
   downloadSlug,
   inviteeName,
+  inviteeTitle,
   existingRsvp,
 }: {
   downloadSlug?: string;
   inviteeName?: string;
+  inviteeTitle?: "Mr" | "Mrs" | "Miss" | null;
   existingRsvp?: ExistingRsvp;
 } = {}) {
   const [open, setOpen] = useState(false);
@@ -591,6 +593,59 @@ export default function Invite({
           <div className="mt-8 flex justify-center">
             <Countdown />
           </div>
+        </section>
+
+        <div className="ornament my-12" aria-hidden>
+          <span className="text-gold/80">✦</span>
+        </div>
+
+        <section className="text-center max-w-md mx-auto">
+          <p className="text-cream/90 text-base sm:text-lg leading-relaxed">
+            <span className="inline-block mr-1">Dear</span>
+            {(["Mr", "Miss", "Mrs"] as const).map((t, idx, arr) => {
+              const isSelected = inviteeTitle === t;
+              const muted = inviteeTitle && !isSelected;
+              return (
+                <span key={t} className="inline-block">
+                  <span
+                    className={
+                      muted
+                        ? "line-through text-cream/40"
+                        : isSelected
+                          ? "gold-gradient-text font-medium"
+                          : "text-cream/90"
+                    }
+                  >
+                    {t}.
+                  </span>
+                  {idx < arr.length - 1 && (
+                    <span className="text-cream/40 mx-0.5">/</span>
+                  )}
+                </span>
+              );
+            })}
+            {inviteeName ? (
+              <span
+                className="inline-block mt-2 pb-1 px-6 gold-gradient-text border-b border-dotted border-gold/60"
+                style={{
+                  fontFamily: "var(--font-script)",
+                  fontSize: "1.75rem",
+                  lineHeight: 1.3,
+                }}
+              >
+                {inviteeName}
+              </span>
+            ) : (
+              <span
+                className="inline-block mt-3 w-64 max-w-[80%] border-b border-dotted border-gold/50 h-4"
+                aria-hidden
+              />
+            )}
+          </p>
+          <p className="text-cream/80 italic mt-5 leading-relaxed">
+            We would be delighted to have your presence with us as we celebrate
+            our special day.
+          </p>
         </section>
 
         <div className="ornament my-12" aria-hidden>

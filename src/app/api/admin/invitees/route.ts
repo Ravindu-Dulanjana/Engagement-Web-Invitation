@@ -1,8 +1,22 @@
 import { NextRequest } from "next/server";
 import { generateSlug, isLoggedIn } from "@/lib/auth";
-import { BUCKET, getSupabaseAdmin, Invitee } from "@/lib/supabase";
+import {
+  BUCKET,
+  getSupabaseAdmin,
+  Invitee,
+  InviteeTitle,
+} from "@/lib/supabase";
 
 const MAX_BYTES = 15 * 1024 * 1024;
+
+const VALID_TITLES: InviteeTitle[] = ["Mr", "Mrs", "Miss"];
+
+function normalizeTitle(raw: FormDataEntryValue | null): InviteeTitle | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  return (VALID_TITLES as string[]).includes(s) ? (s as InviteeTitle) : null;
+}
 
 export async function GET() {
   if (!(await isLoggedIn())) {
@@ -11,7 +25,7 @@ export async function GET() {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("invitees")
-    .select("id, slug, name, pdf_path, created_at")
+    .select("id, slug, name, title, pdf_path, created_at")
     .order("created_at", { ascending: false });
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ invitees: data as Invitee[] });
@@ -30,6 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   const name = String(form.get("name") ?? "").trim();
+  const title = normalizeTitle(form.get("title"));
   const file = form.get("pdf");
   if (!name) {
     return Response.json({ error: "Name is required." }, { status: 400 });
@@ -67,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   const ins = await sb
     .from("invitees")
-    .insert({ slug, name, pdf_path: pdfPath })
+    .insert({ slug, name, title, pdf_path: pdfPath })
     .select()
     .single();
   if (ins.error) {

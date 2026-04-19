@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Invitee, Rsvp } from "@/lib/supabase";
+import type { Invitee, InviteeTitle, Rsvp } from "@/lib/supabase";
+
+const TITLE_OPTIONS: InviteeTitle[] = ["Mr", "Mrs", "Miss"];
 
 function fmt(dt: string) {
   try {
@@ -75,6 +77,7 @@ export default function AdminDashboard({
   const router = useRouter();
   const [invitees, setInvitees] = useState<Invitee[]>(initialInvitees);
   const [name, setName] = useState("");
+  const [title, setTitle] = useState<InviteeTitle | "">("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -114,6 +117,7 @@ export default function AdminDashboard({
     try {
       const body = new FormData();
       body.append("name", name.trim());
+      if (title) body.append("title", title);
       body.append("pdf", file);
       const res = await fetch("/api/admin/invitees", {
         method: "POST",
@@ -126,6 +130,7 @@ export default function AdminDashboard({
       }
       setInvitees((prev) => [data.invitee as Invitee, ...prev]);
       setName("");
+      setTitle("");
       setFile(null);
       const el = document.getElementById("pdf-input") as HTMLInputElement | null;
       if (el) el.value = "";
@@ -216,6 +221,42 @@ export default function AdminDashboard({
               />
             </div>
             <div>
+              <label className="block text-xs tracking-[0.25em] uppercase text-gold/80 mb-2">
+                Title (optional)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {TITLE_OPTIONS.map((t) => (
+                  <label
+                    key={t}
+                    className={`px-4 py-2 rounded-md border cursor-pointer text-sm transition ${
+                      title === t
+                        ? "border-gold bg-gold/15 text-gold-bright"
+                        : "border-gold/25 text-cream/80 hover:border-gold/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="title"
+                      value={t}
+                      checked={title === t}
+                      onChange={() => setTitle(t)}
+                      className="sr-only"
+                    />
+                    {t}
+                  </label>
+                ))}
+                {title && (
+                  <button
+                    type="button"
+                    onClick={() => setTitle("")}
+                    className="px-3 py-2 rounded-md border border-gold/25 text-xs text-cream/60 hover:text-cream/90 hover:border-gold/50"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
               <label className="block text-xs tracking-[0.25em] uppercase text-gold/80 mb-1">
                 Invitation PDF
               </label>
@@ -256,7 +297,10 @@ export default function AdminDashboard({
                   className="p-4 rounded-md border border-gold/20 bg-navy/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                 >
                   <div className="min-w-0">
-                    <div className="text-lg text-cream">{i.name}</div>
+                    <div className="text-lg text-cream">
+                      {i.title ? `${i.title}. ` : ""}
+                      {i.name}
+                    </div>
                     <div className="text-xs text-cream/50 mt-0.5 truncate">
                       /i/{i.slug} · {fmt(i.created_at)}
                     </div>

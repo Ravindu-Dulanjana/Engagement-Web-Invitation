@@ -16,7 +16,7 @@ export default async function AdminPage() {
     const [inv, rs] = await Promise.all([
       sb
         .from("invitees")
-        .select("id, slug, name, pdf_path, created_at")
+        .select("id, slug, name, title, pdf_path, created_at")
         .order("created_at", { ascending: false }),
       sb
         .from("rsvps")

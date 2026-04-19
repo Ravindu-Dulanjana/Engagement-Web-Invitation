@@ -77,9 +77,15 @@ create table if not exists public.invitees (
   id          uuid primary key default gen_random_uuid(),
   slug        text unique not null,
   name        text not null,
+  title       text null check (title is null or title in ('Mr', 'Mrs', 'Miss')),
   pdf_path    text not null,
   created_at  timestamptz not null default now()
 );
+
+-- If you already created this table before titles were added, run once:
+alter table public.invitees
+  add column if not exists title text
+  check (title is null or title in ('Mr', 'Mrs', 'Miss'));
 
 create index if not exists invitees_slug_idx on public.invitees (slug);
 

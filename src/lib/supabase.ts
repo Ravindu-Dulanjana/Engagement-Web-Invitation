@@ -20,10 +20,13 @@ export function getSupabaseAdmin(): SupabaseClient {
 
 export const BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "invitations";
 
+export type InviteeTitle = "Mr" | "Mrs" | "Miss";
+
 export type Invitee = {
   id: string;
   slug: string;
   name: string;
+  title: InviteeTitle | null;
   pdf_path: string;
   created_at: string;
 };
