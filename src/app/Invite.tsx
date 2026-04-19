@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { event, rsvp } from "./config";
+import { event } from "./config";
 
 function CornerOrnament({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
   return (
@@ -202,42 +202,46 @@ function Countdown() {
   );
 }
 
-function RsvpForm() {
+function RsvpForm({
+  slug,
+  defaultName,
+}: {
+  slug?: string;
+  defaultName?: string;
+}) {
   const [status, setStatus] = useState<RsvpStatus>("idle");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(defaultName ?? "");
   const [attending, setAttending] = useState<"Yes" | "No" | "">("");
   const [message, setMessage] = useState("");
-
-  const configured = Boolean(
-    rsvp.formActionUrl &&
-      rsvp.fields.name &&
-      rsvp.fields.attending &&
-      rsvp.fields.message,
-  );
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!attending) return;
-    if (!configured) {
-      setStatus("error");
-      return;
-    }
     setStatus("sending");
+    setErrorMsg(null);
     try {
-      const body = new FormData();
-      body.append(rsvp.fields.name, name);
-      body.append(rsvp.fields.attending, attending);
-      body.append(rsvp.fields.message, message);
-      await fetch(rsvp.formActionUrl, {
+      const res = await fetch("/api/rsvp", {
         method: "POST",
-        mode: "no-cors",
-        body,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          name: name.trim(),
+          attending,
+          message: message.trim(),
+        }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErrorMsg(body.error || "Something went wrong. Please try again.");
+        setStatus("error");
+        return;
+      }
       setStatus("sent");
-      setName("");
       setAttending("");
       setMessage("");
     } catch {
+      setErrorMsg("Network error. Please try again.");
       setStatus("error");
     }
   }
@@ -249,6 +253,13 @@ function RsvpForm() {
         <p className="text-cream/80 mt-2">
           Your response has been received. We can&apos;t wait to see you.
         </p>
+        <button
+          type="button"
+          onClick={() => setStatus("idle")}
+          className="mt-4 text-xs tracking-[0.3em] uppercase text-gold/80 hover:text-gold-bright"
+        >
+          Update your response
+        </button>
       </div>
     );
   }
@@ -311,12 +322,8 @@ function RsvpForm() {
         {status === "sending" ? "Sending…" : "Send RSVP"}
       </button>
 
-      {status === "error" && (
-        <p className="text-sm text-red-300/90 text-center">
-          {configured
-            ? "Something went wrong. Please try again."
-            : "RSVP form is not yet configured. See README for setup steps."}
-        </p>
+      {status === "error" && errorMsg && (
+        <p className="text-sm text-red-300/90 text-center">{errorMsg}</p>
       )}
     </form>
   );
@@ -579,7 +586,7 @@ export default function Invite({
           >
             We&apos;d love to hear from you
           </p>
-          <RsvpForm />
+          <RsvpForm slug={downloadSlug} defaultName={inviteeName} />
         </section>
 
         <footer className="mt-16 text-center">

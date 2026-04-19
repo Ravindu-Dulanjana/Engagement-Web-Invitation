@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
-import { getSupabaseAdmin, Invitee } from "@/lib/supabase";
+import { getSupabaseAdmin, Invitee, Rsvp } from "@/lib/supabase";
 import AdminDashboard from "./AdminDashboard";
 
 export const dynamic = "force-dynamic";
@@ -8,20 +8,34 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   if (!(await isLoggedIn())) redirect("/admin/login");
 
-  let initial: Invitee[] = [];
+  let invitees: Invitee[] = [];
+  let rsvps: Rsvp[] = [];
   let loadError: string | null = null;
   try {
     const sb = getSupabaseAdmin();
-    const { data, error } = await sb
-      .from("invitees")
-      .select("id, slug, name, pdf_path, created_at")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    initial = (data as Invitee[]) ?? [];
+    const [inv, rs] = await Promise.all([
+      sb
+        .from("invitees")
+        .select("id, slug, name, pdf_path, created_at")
+        .order("created_at", { ascending: false }),
+      sb
+        .from("rsvps")
+        .select("id, slug, name, attending, message, created_at")
+        .order("created_at", { ascending: false }),
+    ]);
+    if (inv.error) throw inv.error;
+    if (rs.error) throw rs.error;
+    invitees = (inv.data as Invitee[]) ?? [];
+    rsvps = (rs.data as Rsvp[]) ?? [];
   } catch (e) {
-    loadError =
-      e instanceof Error ? e.message : "Could not load invitees from Supabase.";
+    loadError = e instanceof Error ? e.message : "Could not load data from Supabase.";
   }
 
-  return <AdminDashboard initial={initial} loadError={loadError} />;
+  return (
+    <AdminDashboard
+      initialInvitees={invitees}
+      initialRsvps={rsvps}
+      loadError={loadError}
+    />
+  );
 }

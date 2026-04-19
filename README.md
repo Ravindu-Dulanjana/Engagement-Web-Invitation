@@ -68,7 +68,7 @@ uploaded for them in the admin panel.
 
 In your Supabase project:
 
-**a. Create the table.** SQL editor → New query → run:
+**a. Create the tables.** SQL editor → New query → run:
 
 ```sql
 create extension if not exists pgcrypto;
@@ -82,10 +82,27 @@ create table if not exists public.invitees (
 );
 
 create index if not exists invitees_slug_idx on public.invitees (slug);
+
+create table if not exists public.rsvps (
+  id          uuid primary key default gen_random_uuid(),
+  slug        text null,
+  name        text not null,
+  attending   text not null check (attending in ('Yes', 'No')),
+  message     text default '',
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists rsvps_slug_idx on public.rsvps (slug);
+create index if not exists rsvps_created_at_idx on public.rsvps (created_at desc);
 ```
 
 This project talks to Supabase with the **service role key** from the server,
 so you do not need to create Row Level Security policies.
+
+RSVPs are append-only: each submission creates a new row with a timestamp. The
+admin panel groups by invitee (by `slug` if present, otherwise by normalized
+name) and shows the most recent submission per person, with full history
+viewable on demand.
 
 **b. Create a private Storage bucket** called `invitations` (Storage → New
 bucket → **uncheck** "Public bucket").

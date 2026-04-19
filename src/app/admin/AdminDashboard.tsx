@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Invitee } from "@/lib/supabase";
+import type { Invitee, Rsvp } from "@/lib/supabase";
 
 function fmt(dt: string) {
   try {
@@ -12,21 +12,89 @@ function fmt(dt: string) {
   }
 }
 
+function rsvpKey(r: Rsvp): string {
+  return r.slug
+    ? `slug:${r.slug}`
+    : `name:${r.name.trim().toLowerCase()}`;
+}
+
+type RsvpGroup = {
+  key: string;
+  latest: Rsvp;
+  history: Rsvp[];
+  slug: string | null;
+  displayName: string;
+  isOrphanSlug: boolean;
+};
+
+function groupRsvps(
+  rsvps: Rsvp[],
+  slugToInviteeName: Map<string, string>,
+): RsvpGroup[] {
+  const map = new Map<string, Rsvp[]>();
+  for (const r of rsvps) {
+    const k = rsvpKey(r);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(r);
+  }
+  const groups: RsvpGroup[] = [];
+  for (const [key, rows] of map) {
+    rows.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    const latest = rows[0];
+    const inviteeName = latest.slug ? slugToInviteeName.get(latest.slug) : null;
+    const displayName = inviteeName ?? latest.name;
+    const isOrphanSlug = Boolean(latest.slug) && !inviteeName;
+    groups.push({
+      key,
+      latest,
+      history: rows,
+      slug: latest.slug,
+      displayName,
+      isOrphanSlug,
+    });
+  }
+  groups.sort(
+    (a, b) =>
+      new Date(b.latest.created_at).getTime() -
+      new Date(a.latest.created_at).getTime(),
+  );
+  return groups;
+}
+
 export default function AdminDashboard({
-  initial,
+  initialInvitees,
+  initialRsvps,
   loadError,
 }: {
-  initial: Invitee[];
+  initialInvitees: Invitee[];
+  initialRsvps: Rsvp[];
   loadError: string | null;
 }) {
   const router = useRouter();
-  const [invitees, setInvitees] = useState<Invitee[]>(initial);
+  const [invitees, setInvitees] = useState<Invitee[]>(initialInvitees);
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const slugToInviteeName = useMemo(
+    () => new Map(invitees.map((i) => [i.slug, i.name] as const)),
+    [invitees],
+  );
+  const rsvpGroups = useMemo(
+    () => groupRsvps(initialRsvps, slugToInviteeName),
+    [initialRsvps, slugToInviteeName],
+  );
+  const counts = useMemo(() => {
+    const yes = rsvpGroups.filter((g) => g.latest.attending === "Yes").length;
+    const no = rsvpGroups.filter((g) => g.latest.attending === "No").length;
+    return { yes, no, total: rsvpGroups.length };
+  }, [rsvpGroups]);
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -59,8 +127,8 @@ export default function AdminDashboard({
       setInvitees((prev) => [data.invitee as Invitee, ...prev]);
       setName("");
       setFile(null);
-      (document.getElementById("pdf-input") as HTMLInputElement | null)?.value &&
-        ((document.getElementById("pdf-input") as HTMLInputElement).value = "");
+      const el = document.getElementById("pdf-input") as HTMLInputElement | null;
+      if (el) el.value = "";
       setMsg(`Added ${data.invitee.name}.`);
     } catch {
       setErr("Network error.");
@@ -105,18 +173,27 @@ export default function AdminDashboard({
           >
             Admin
           </h1>
-          <button onClick={logout} className="btn-outline text-sm">
-            Sign out
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => router.refresh()}
+              className="btn-outline text-sm"
+              title="Refresh data"
+            >
+              Refresh
+            </button>
+            <button onClick={logout} className="btn-outline text-sm">
+              Sign out
+            </button>
+          </div>
         </header>
 
         {loadError && (
           <div className="mb-6 p-4 rounded-md border border-red-400/40 bg-red-950/30 text-red-200 text-sm">
             <strong>Supabase not reachable:</strong> {loadError}
             <div className="mt-2 text-cream/70">
-              Fill in SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in{" "}
-              <code>.env.local</code>, then restart{" "}
-              <code>npm run dev</code>. See README for full setup.
+              Check your env vars in <code>.env.local</code>, and that both the{" "}
+              <code>invitees</code> and <code>rsvps</code> tables exist. See
+              README for full setup.
             </div>
           </div>
         )}
@@ -163,7 +240,7 @@ export default function AdminDashboard({
           </form>
         </section>
 
-        <section>
+        <section className="mb-12">
           <h2 className="text-xs tracking-[0.3em] uppercase text-gold/80 mb-4">
             Invitees ({invitees.length})
           </h2>
@@ -208,6 +285,140 @@ export default function AdminDashboard({
                   </div>
                 </li>
               ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-xs tracking-[0.3em] uppercase text-gold/80">
+              RSVPs ({counts.total} {counts.total === 1 ? "person" : "people"})
+            </h2>
+            {counts.total > 0 && (
+              <div className="text-xs text-cream/70 tracking-wider">
+                <span className="text-emerald-300">{counts.yes} attending</span>
+                <span className="text-cream/40"> · </span>
+                <span className="text-red-300/90">{counts.no} declining</span>
+              </div>
+            )}
+          </div>
+          {rsvpGroups.length === 0 ? (
+            <p className="text-cream/60 text-sm italic">
+              No RSVPs yet. Responses submitted via the invitation will appear
+              here.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {rsvpGroups.map((g) => {
+                const isOpen = expanded === g.key;
+                const hasHistory = g.history.length > 1;
+                const yesTone =
+                  g.latest.attending === "Yes"
+                    ? "border-emerald-400/40 text-emerald-300 bg-emerald-400/10"
+                    : "border-red-400/40 text-red-300 bg-red-400/10";
+                return (
+                  <li
+                    key={g.key}
+                    className="rounded-md border border-gold/20 bg-navy/40 overflow-hidden"
+                  >
+                    <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-lg text-cream truncate">
+                            {g.displayName}
+                          </span>
+                          <span
+                            className={`text-[10px] tracking-[0.25em] uppercase px-2 py-0.5 rounded-full border ${yesTone}`}
+                          >
+                            {g.latest.attending === "Yes" ? "Attending" : "Declining"}
+                          </span>
+                          {g.isOrphanSlug && (
+                            <span className="text-[10px] tracking-[0.25em] uppercase px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300">
+                              Invitee deleted
+                            </span>
+                          )}
+                          {g.slug && !g.isOrphanSlug && (
+                            <a
+                              href={`/i/${g.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] text-cream/50 hover:text-gold/90 truncate"
+                            >
+                              /i/{g.slug}
+                            </a>
+                          )}
+                        </div>
+                        {g.latest.name.trim().toLowerCase() !==
+                          g.displayName.trim().toLowerCase() && (
+                          <div className="text-xs text-cream/65 mt-1">
+                            Submitted as:{" "}
+                            <span className="text-cream/85">{g.latest.name}</span>
+                          </div>
+                        )}
+                        <div className="text-xs text-cream/55 mt-1">
+                          Latest: {fmt(g.latest.created_at)}
+                          {hasHistory &&
+                            ` · ${g.history.length} submissions`}
+                        </div>
+                        {g.latest.message && (
+                          <p className="mt-2 text-sm text-cream/85 italic whitespace-pre-wrap">
+                            “{g.latest.message}”
+                          </p>
+                        )}
+                      </div>
+                      {hasHistory && (
+                        <button
+                          onClick={() => setExpanded(isOpen ? null : g.key)}
+                          className="btn-outline text-xs self-start sm:self-auto"
+                        >
+                          {isOpen ? "Hide history" : "View history"}
+                        </button>
+                      )}
+                    </div>
+                    {isOpen && hasHistory && (
+                      <div className="px-4 pb-4 border-t border-gold/10">
+                        <ol className="mt-3 space-y-3">
+                          {g.history.map((r, idx) => (
+                            <li
+                              key={r.id}
+                              className="pl-4 border-l border-gold/20"
+                            >
+                              <div className="text-xs text-cream/55 flex items-center gap-2 flex-wrap">
+                                <span>{fmt(r.created_at)}</span>
+                                <span
+                                  className={`text-[10px] tracking-[0.25em] uppercase px-1.5 py-0.5 rounded-full border ${
+                                    r.attending === "Yes"
+                                      ? "border-emerald-400/40 text-emerald-300"
+                                      : "border-red-400/40 text-red-300"
+                                  }`}
+                                >
+                                  {r.attending}
+                                </span>
+                                {idx === 0 && (
+                                  <span className="text-[10px] tracking-[0.25em] uppercase text-gold/80">
+                                    Latest
+                                  </span>
+                                )}
+                              </div>
+                              {r.name.trim().toLowerCase() !==
+                                g.displayName.trim().toLowerCase() && (
+                                <div className="text-xs text-cream/65 mt-1">
+                                  Submitted as: {r.name}
+                                </div>
+                              )}
+                              {r.message && (
+                                <p className="mt-1 text-sm text-cream/80 italic whitespace-pre-wrap">
+                                  “{r.message}”
+                                </p>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

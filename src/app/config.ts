@@ -15,12 +15,3 @@ export const event = {
   contactLabel: "For enquiries, please contact Ravindu",
   contactPhone: "077-4899159",
 };
-
-export const rsvp = {
-  formActionUrl: "",
-  fields: {
-    name: "",
-    attending: "",
-    message: "",
-  },
-};

@@ -27,3 +27,12 @@ export type Invitee = {
   pdf_path: string;
   created_at: string;
 };
+
+export type Rsvp = {
+  id: string;
+  slug: string | null;
+  name: string;
+  attending: "Yes" | "No";
+  message: string | null;
+  created_at: string;
+};
