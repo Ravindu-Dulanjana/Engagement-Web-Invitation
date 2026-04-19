@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   --navy-deep: #050a1a;
   --navy: #0b1530;
   --navy-soft: #132048;
@@ -294,6 +295,26 @@ body {
 .field-input:focus {
   border-color: rgba(212, 175, 55, 0.7);
   background: rgba(11, 21, 48, 0.85);
+}
+
+/* Keep autofill (Chrome/Safari) from flashing pale yellow on dark theme */
+.field-input:-webkit-autofill,
+.field-input:-webkit-autofill:hover,
+.field-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--cream);
+  caret-color: var(--cream);
+  transition: background-color 99999s ease-in-out 0s;
+  box-shadow: 0 0 0 1000px rgba(11, 21, 48, 0.9) inset !important;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+
+::selection {
+  background: rgba(212, 175, 55, 0.35);
+  color: var(--cream);
+}
+
+::placeholder {
+  color: rgba(244, 231, 196, 0.4);
 }
 
 .pulse-hint {

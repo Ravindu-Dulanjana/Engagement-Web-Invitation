@@ -20,6 +20,11 @@ export const metadata: Metadata = {
     "Join us to celebrate the engagement of Ravindu & Wathsala on 4 May 2026 at Mudalige Dream Paradise.",
 };
 
+export const viewport = {
+  themeColor: "#050a1a",
+  colorScheme: "dark" as const,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
