@@ -11,13 +11,36 @@ export default async function InviteePage({
 }) {
   const { slug } = await params;
   const sb = getSupabaseAdmin();
+
   const row = await sb
     .from("invitees")
     .select("name, slug")
     .eq("slug", slug)
     .maybeSingle();
-
   if (row.error || !row.data) notFound();
 
-  return <Invite downloadSlug={row.data.slug} inviteeName={row.data.name} />;
+  const latest = await sb
+    .from("rsvps")
+    .select("attending, message, name, created_at")
+    .eq("slug", slug)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const existingRsvp =
+    latest.data && (latest.data.attending === "Yes" || latest.data.attending === "No")
+      ? {
+          attending: latest.data.attending as "Yes" | "No",
+          message: latest.data.message ?? "",
+          name: latest.data.name ?? row.data.name,
+        }
+      : undefined;
+
+  return (
+    <Invite
+      downloadSlug={row.data.slug}
+      inviteeName={row.data.name}
+      existingRsvp={existingRsvp}
+    />
+  );
 }

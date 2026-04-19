@@ -205,15 +205,26 @@ function Countdown() {
 function RsvpForm({
   slug,
   defaultName,
+  existingRsvp,
 }: {
   slug?: string;
   defaultName?: string;
+  existingRsvp?: ExistingRsvp;
 }) {
-  const [status, setStatus] = useState<RsvpStatus>("idle");
-  const [name, setName] = useState(defaultName ?? "");
-  const [attending, setAttending] = useState<"Yes" | "No" | "">("");
-  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<RsvpStatus>(
+    existingRsvp ? "sent" : "idle",
+  );
+  const [name, setName] = useState(
+    existingRsvp?.name || defaultName || "",
+  );
+  const [attending, setAttending] = useState<"Yes" | "No" | "">(
+    existingRsvp?.attending ?? "",
+  );
+  const [message, setMessage] = useState(existingRsvp?.message ?? "");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [lastResponse, setLastResponse] = useState<"Yes" | "No" | null>(
+    existingRsvp?.attending ?? null,
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -237,9 +248,8 @@ function RsvpForm({
         setStatus("error");
         return;
       }
+      setLastResponse(attending);
       setStatus("sent");
-      setAttending("");
-      setMessage("");
     } catch {
       setErrorMsg("Network error. Please try again.");
       setStatus("error");
@@ -247,16 +257,39 @@ function RsvpForm({
   }
 
   if (status === "sent") {
+    const isYes = lastResponse === "Yes";
     return (
       <div className="text-center py-6">
-        <p className="text-2xl gold-gradient-text font-light">Thank you</p>
-        <p className="text-cream/80 mt-2">
-          Your response has been received. We can&apos;t wait to see you.
+        <p
+          className="gold-gradient-text py-1"
+          style={{
+            fontFamily: "var(--font-script)",
+            fontSize: "2rem",
+            lineHeight: 1.25,
+          }}
+        >
+          Thank you{name ? `, ${name.split(" ")[0]}` : ""}
+        </p>
+        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gold/40 bg-gold/10">
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              isYes ? "bg-emerald-400" : "bg-red-400"
+            }`}
+            aria-hidden
+          />
+          <span className="text-xs tracking-[0.25em] uppercase text-cream/90">
+            You said {isYes ? "yes" : "no"}
+          </span>
+        </div>
+        <p className="text-cream/80 mt-4 max-w-sm mx-auto">
+          {isYes
+            ? "Your response has been received. We can’t wait to celebrate with you."
+            : "Your response has been received. You’ll be missed — thank you for letting us know."}
         </p>
         <button
           type="button"
           onClick={() => setStatus("idle")}
-          className="mt-4 text-xs tracking-[0.3em] uppercase text-gold/80 hover:text-gold-bright"
+          className="mt-5 text-xs tracking-[0.3em] uppercase text-gold/80 hover:text-gold-bright"
         >
           Update your response
         </button>
@@ -371,12 +404,20 @@ function MapBlock() {
   );
 }
 
+type ExistingRsvp = {
+  attending: "Yes" | "No";
+  message: string;
+  name: string;
+};
+
 export default function Invite({
   downloadSlug,
   inviteeName,
+  existingRsvp,
 }: {
   downloadSlug?: string;
   inviteeName?: string;
+  existingRsvp?: ExistingRsvp;
 } = {}) {
   const [open, setOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -586,7 +627,11 @@ export default function Invite({
           >
             We&apos;d love to hear from you
           </p>
-          <RsvpForm slug={downloadSlug} defaultName={inviteeName} />
+          <RsvpForm
+            slug={downloadSlug}
+            defaultName={inviteeName}
+            existingRsvp={existingRsvp}
+          />
         </section>
 
         <footer className="mt-16 text-center">
